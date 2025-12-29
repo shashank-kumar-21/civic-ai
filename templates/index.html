@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Civic AI Assistant</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: "Segoe UI", sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .chat-container {
+            width: 420px;
+            height: 600px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 15px;
+            background: #2563eb;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 15px 15px 0 0;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .message {
+            max-width: 75%;
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .user {
+            background: #2563eb;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 2px;
+        }
+
+        .assistant {
+            background: #e5e7eb;
+            color: #111;
+            margin-right: auto;
+            border-bottom-left-radius: 2px;
+        }
+
+        form {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #ddd;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            outline: none;
+        }
+
+        button {
+            margin-left: 8px;
+            padding: 10px 15px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1e4fd8;
+        }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="header">
+        🛠 Civic AI Complaint Assistant
+    </div>
+
+    <div class="messages">
+        {% for role, msg in messages %}
+            <div class="message {{ role }}">
+                {{ msg }}
+            </div>
+        {% endfor %}
+    </div>
+
+    <form method="post" action="/chat">
+        <input type="text" name="message" placeholder="Type your message..." required />
+        <button type="submit">Send</button>
+    </form>
+</div>
+
+</body>
+</html>
