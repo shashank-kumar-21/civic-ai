@@ -1,17 +1,27 @@
-from phi.agent import Agent # type: ignore
-from phi.model.groq import Groq # type: ignore
-from phi.tools.duckduckgo import DuckDuckGo # type: ignore
-from dotenv import load_dotenv # type: ignore
-from database import SessionLocal, Complaint
-import random,time
+import os
+import random
 import string
+import time
+from dotenv import load_dotenv
+import google.generativeai as genai
+from database import SessionLocal, Complaint
+
 load_dotenv()
 
-conversation_state = {
-    "type": None,
-    "step": 0,
-    "answers": {}
-}
+# ---------------------------
+# Gemini setup
+# ---------------------------
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+model = genai.GenerativeModel("gemini-1.5-flash")
+
+
+# ---------------------------
+# Conversation State Helpers
+# ---------------------------
+
+def generate_reference_id():
+    return "CMP-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
 
 COMPLAINT_FLOWS = {
     "internet": [
@@ -42,72 +52,36 @@ COMPLAINT_FLOWS = {
 }
 
 
-def reset_conversation():
-    conversation_state["type"] = None
-    conversation_state["data"] = {}
-    conversation_state["step"] = "start"
-
-def save_complaint(ref_id, ctype, location, issue):
-    db = SessionLocal()
-    complaint = Complaint(
-        reference_id=ref_id,
-        complaint_type=ctype,
-        location=location,
-        issue=issue
-    )
-    db.add(complaint)
-    db.commit()
-    db.close()
-
-def detect_complaint_type(text):
+def detect_complaint_type(text: str) -> str:
     text = text.lower()
 
-    if any(x in text for x in ["internet", "wifi", "router"]):
+    if any(w in text for w in ["internet", "wifi", "router"]):
         return "internet"
-    if any(x in text for x in ["garbage", "trash", "waste"]):
+    if any(w in text for w in ["garbage", "trash", "waste"]):
         return "garbage"
-    if any(x in text for x in ["water", "leak"]):
+    if any(w in text for w in ["water", "leak"]):
         return "water"
-    if any(x in text for x in ["electricity", "power"]):
+    if any(w in text for w in ["electricity", "power"]):
         return "electricity"
 
     return "general"
 
 
-def generate_reference_id():
-    return "CMP-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
-
-def submit_complaint(data: dict={}) -> str:
-    return f"Complaint registered successfully: {data}"
-
-def validate(text: str="") -> bool:
-    return len(text.strip()) > 5
-
-duckduckgo = DuckDuckGo()
-
-import time
-import random
-import string
-
-def generate_reference_id():
-    return "CMP-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
-
+# ---------------------------
+# MAIN PROCESS FUNCTION
+# ---------------------------
 
 def process_message(message: str, state: dict):
     time.sleep(0.3)
 
-    def generate_reference_id():
-        return "CMP-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
-
-    msg = message.strip()
-
-    # Ensure state exists
     state.setdefault("step", "greeting")
     state.setdefault("type", None)
     state.setdefault("answers", {})
     state.setdefault("question_index", 0)
 
-    # STEP 1: Greeting
+    msg = message.strip()
+
+    # STEP 1 — Greeting
     if state["step"] == "greeting":
         state["step"] = "identify"
         return (
@@ -116,38 +90,35 @@ def process_message(message: str, state: dict):
             "What problem are you facing today?"
         )
 
-    # STEP 2: Identify complaint type
+    # STEP 2 — Identify issue type
     if state["step"] == "identify":
         state["type"] = detect_complaint_type(msg)
-        state["step"] = "confirm_type"
-        return f"I understand this is a **{state['type']} issue**. Let me ask you a few quick questions."
-
-    # STEP 3: Start questions
-    if state["step"] == "confirm_type":
         state["step"] = "questions"
         state["question_index"] = 0
         state["answers"] = {}
-        return COMPLAINT_FLOWS[state["type"]][0]
 
-    # STEP 4: Collect answers
+        return f"I understand this is a **{state['type']} issue**. Let me ask you a few questions."
+
+    # STEP 3 — Ask questions
     if state["step"] == "questions":
         questions = COMPLAINT_FLOWS[state["type"]]
-        idx = state["question_index"]
 
-        state["answers"][questions[idx]] = msg
-        state["question_index"] += 1
+        if state["question_index"] > 0:
+            prev_q = questions[state["question_index"] - 1]
+            state["answers"][prev_q] = msg
 
         if state["question_index"] < len(questions):
-            return questions[state["question_index"]]
+            q = questions[state["question_index"]]
+            state["question_index"] += 1
+            return q
 
-        # ✅ Save complaint to DB
+        # STEP 4 — Save to DB
         ref_id = generate_reference_id()
 
         db = SessionLocal()
         complaint = Complaint(
             reference_id=ref_id,
             category=state["type"],
-            location=state["answers"].get("What is the affected location?", "N/A"),
             details=str(state["answers"])
         )
         db.add(complaint)
@@ -155,56 +126,18 @@ def process_message(message: str, state: dict):
         db.close()
 
         summary = "\n".join(
-            f"• {q}: {a}" for q, a in state["answers"].items()
+            f"• {k}: {v}" for k, v in state["answers"].items()
         )
 
-        response = (
+        state.clear()
+        state["step"] = "greeting"
+
+        return (
             f"✅ Your complaint has been registered successfully!\n\n"
             f"📄 Reference ID: {ref_id}\n"
-            f"📌 Category: {state['type']}\n"
+            f"📌 Category: {state.get('type','N/A')}\n\n"
             f"{summary}\n\n"
             "You can report another issue anytime 😊"
         )
 
-        # Reset session
-        state.clear()
-        state["step"] = "greeting"
-
-        return response
-
-    return "How can I assist you today?"
-
-
-
-agent = Agent(
-    model=Groq(id="meta-llama/llama-4-scout-17b-16e-instruct"),
-    tools=[
-        duckduckgo,
-    ],
-    instructions="""
-
-You are a civic complaint assistant.
-
-RULES:
-- Ask ONLY what is strictly required at each step.
-- Ask ONE question at a time.
-- Do NOT repeat previously provided information.
-- Do NOT explain what you are doing.
-- Do NOT use long paragraphs.
-- Keep responses short and clear.
-
-FLOW:
-1. Identify the issue type.
-2. Collect missing required fields one by one.
-3. Once all required data is collected, confirm and submit the complaint.
-4. Respond politely and concisely.
-
-EXAMPLE STYLE:
-"Please tell me your ISP."
-"Thanks. What city are you in?"
-"Your complaint has been registered."
-""",
-    show_tool_calls=False,
-    markdown=False,
-)
-
+    return "How can I help you?"
