@@ -22,7 +22,7 @@ An AI-powered web application that helps users register civic complaints through
 ```bash
 pip install -r requirements.txt
 
-GROQ_API_KEY=your_api_key_here
+GEMINI_API_KEY=your_api_key_here
 
 uvicorn app:app --reload
 
