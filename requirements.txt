@@ -7,3 +7,6 @@ requests
 duckduckgo-search
 python-dotenv
 openai
+sqlalchemy
+jinja2
+

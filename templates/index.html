@@ -48,6 +48,7 @@
             border-radius: 12px;
             font-size: 14px;
             line-height: 1.4;
+            animation: fadeIn 0.2s ease-in;
         }
 
         .user {
@@ -91,28 +92,51 @@
         button:hover {
             background: #1e4fd8;
         }
+
+        .reset-btn {
+            background: #dc2626;
+            margin: 10px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
+
 <body>
 
 <div class="chat-container">
-    <div class="header">
-        🛠 Civic AI Complaint Assistant
-    </div>
+    <div class="header">🛠 Civic AI Complaint Assistant</div>
 
-    <div class="messages">
-        {% for role, msg in messages %}
-            <div class="message {{ role }}">
-                {{ msg }}
+    <div class="messages" id="chat">
+        {% if messages %}
+            {% for role, msg in messages %}
+                <div class="message {{ role }}">{{ msg }}</div>
+            {% endfor %}
+        {% else %}
+            <div class="message assistant">
+                👋 Hi! I'm your Civic AI Assistant.<br><br>
+                Please tell me what issue you're facing today.
             </div>
-        {% endfor %}
+        {% endif %}
     </div>
 
     <form method="post" action="/chat">
         <input type="text" name="message" placeholder="Type your message..." required />
         <button type="submit">Send</button>
     </form>
+
+    <form action="/reset" method="post">
+        <button type="submit" class="reset-btn">Reset Chat</button>
+    </form>
 </div>
+
+<script>
+    const chat = document.getElementById("chat");
+    chat.scrollTop = chat.scrollHeight;
+</script>
 
 </body>
 </html>
